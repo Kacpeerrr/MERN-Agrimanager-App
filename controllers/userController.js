@@ -90,14 +90,16 @@ const loginUser = asyncHandler(async (req, res) => {
 	//Generate token
 	const token = generateToken(user._id)
 
-	//Send HTTP-only cookie
-	res.cookie('token', token, {
-		path: '/',
-		httpOnly: true,
-		expires: new Date(Date.now() + 1000 * 86400), //1day
-		sameSite: 'none',
-		secure: true,
-	})
+	if (passwordIsCorrect) {
+		//Send HTTP-only cookie
+		res.cookie('token', token, {
+			path: '/',
+			httpOnly: true,
+			expires: new Date(Date.now() + 1000 * 86400), //1day
+			sameSite: 'none',
+			secure: true,
+		})
+	}
 
 	if (user && passwordIsCorrect) {
 		const { _id, name, email, photo, phone, bio } = user
@@ -125,12 +127,43 @@ const logout = asyncHandler(async (req, res) => {
 		sameSite: 'none',
 		secure: true,
 	})
-	res.status(200).json({ message: 'Wylogowałeś się!'})
+	res.status(200).json({ message: 'Wylogowałeś się!' })
 })
 
 //Get User
 const getUser = asyncHandler(async (req, res) => {
-	res.send('Get User Data')
+	const user = await User.findById(req.user._id)
+
+	if (user) {
+		const { _id, name, email, photo, phone, bio } = user
+
+		res.status(200).json({
+			_id,
+			name,
+			email,
+			photo,
+			phone,
+			bio,
+		})
+	} else {
+		res.status(400)
+		throw new Error('Użytkownik nie istnieje')
+	}
+})
+
+//Get login status
+const loginStatus = asyncHandler(async (req, res) => {
+	const token = req.cookies.token
+	if (!token) {
+		return res.json(false)
+	}
+
+	//Verify Token
+	const verified = jwt.verify(token, process.env.JWT_SECRET)
+	if (verified) {
+		return res.json(true)
+	}
+	return res.json(false)
 })
 
 module.exports = {
@@ -138,4 +171,5 @@ module.exports = {
 	loginUser,
 	logout,
 	getUser,
+	loginStatus,
 }
