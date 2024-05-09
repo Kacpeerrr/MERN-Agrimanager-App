@@ -166,10 +166,68 @@ const loginStatus = asyncHandler(async (req, res) => {
 	return res.json(false)
 })
 
+//Update user
+const updateUser = asyncHandler(async (req, res) => {
+	const user = await User.findById(req.user._id)
+
+	if (user) {
+		const { name, email, photo, phone, bio } = user
+		user.email = email
+		user.name = req.body.name || name
+		user.phone = req.body.phone || phone
+		user.bio = req.body.bio || bio
+		user.photo = req.body.photo || photo
+
+		const updateUser = await user.save()
+		res.status(200).json({
+			_id: updateUser._id,
+			name: updateUser.name,
+			email: updateUser.email,
+			photo: updateUser.photo,
+			phone: updateUser.phone,
+			bio: updateUser.bio,
+		})
+	} else {
+		res.status(404)
+		throw new Error('Użytkownik nie istnieje')
+	}
+})
+
+//Change password
+const changePassword = asyncHandler(async (req, res) => {
+	const user = await User.findById(req.user._id)
+	const { oldPassword, password } = req.body
+
+	if (!user) {
+		res.status(400)
+		throw new Error('Użytkownik nie istnieje. Zarejestruj się!')
+	}
+
+	//Validate
+	if (!oldPassword || !password) {
+		res.status(400)
+		throw new Error('Podaj stare i nowe hasło ')
+	}
+	// Check if old password matches in DB
+	const passwordIsCorrect = await bcrypt.compare(oldPassword, user.password)
+
+	// Save new password
+	if (user && passwordIsCorrect) {
+		user.password = password
+		await user.save()
+		res.status(200).send('Nastąpiła zmiana hasła')
+	} else {
+		res.status(400)
+		throw new Error('Stare hasło jest niepoprawne')
+	}
+})
+
 module.exports = {
 	registerUser,
 	loginUser,
 	logout,
 	getUser,
 	loginStatus,
+	updateUser,
+	changePassword,
 }
