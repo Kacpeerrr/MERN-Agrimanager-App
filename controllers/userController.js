@@ -2,6 +2,9 @@ const asyncHandler = require('express-async-handler')
 const User = require('../models/userModel')
 const jwt = require('jsonwebtoken')
 const bcrypt = require('bcryptjs')
+const Token = require('../models/tokenModel')
+const crypto = require('crypto')
+const sendEmail = require('../utils/sendEmail')
 
 //Generate Token
 const generateToken = id => {
@@ -222,6 +225,90 @@ const changePassword = asyncHandler(async (req, res) => {
 	}
 })
 
+// Forgot password
+const forgotPassword = asyncHandler(async (req, res) => {
+	const { email } = req.body
+	const user = await User.findOne({ email })
+
+	if (!user) {
+		res.status(404)
+		throw new Error('Użytkownik nie istnieje')
+	}
+
+	// Delete token if it exists in DB
+	let token = await Token.findOne({ userId: user._id })
+	if (token) {
+		await token.deleteOne()
+	}
+
+	// Create Reset Token
+	let resetToken = crypto.randomBytes(32).toString('hex') + user._id
+
+	//Hash token before saving to DB
+	const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex')
+
+	// Save Token to DB
+	await new Token({
+		userId: user._id,
+		token: hashedToken,
+		createdAt: Date.now(),
+		expiresAt: Date.now() + 40 * (60 * 1000), //40 minutes
+	}).save()
+
+	// Construct reset URL
+	const resetUrl = `${process.env.FRONTEND_URL}/resetpassword/${resetToken}`
+
+	// Reset email
+	const message = `
+		<h2>Cześć ${user.name} - użytkowniku agrimanager.pl </h2>
+		<p>Kliknij w link poniżej, aby zresetować swoje hasło.</p>
+		<p>Link ważny jest tylko 40 minut.</p>
+		<a href=${resetUrl} clicktracking=off>${resetUrl}</a>
+		<p>Pozdrawiamy</p>
+		<p>agrimanager.pl</p>
+	`
+
+	const subject = 'Zresetuj swoje hasło do agrimanager.pl'
+	const send_to = user.email
+	const sent_from = process.env.EMAIL_USER
+
+	try {
+		await sendEmail(subject, message, send_to, sent_from)
+		res.status(200).json({ success: true, message: 'Email z linkiem do resetowania hasła został wysłany' })
+	} catch (error) {
+		res.status(500)
+		throw new Error('Email niewysłany. Spróbuj ponownie!')
+	}
+})
+
+// Reset password
+const resetPassword = asyncHandler(async (req, res) => {
+	const { password } = req.body
+	const { resetToken } = req.params
+
+	// Hash token, then compare to Token in DB
+	const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex')
+
+	//Find token in DB
+	const userToken = await Token.findOne({
+		token: hashedToken,
+		expiresAt: { $gt: Date.now() },
+	})
+
+	if (!userToken) {
+		res.status(404)
+		throw new Error('Niepoprawny lub wygasły token')
+	}
+
+	//Find user
+	const user = await User.findOne({ _id: userToken.userId })
+	user.password = password
+	await user.save()
+	res.status(200).json({
+		message: 'Hasło zesetowane. Zaloguj się!',
+	})
+})
+
 module.exports = {
 	registerUser,
 	loginUser,
@@ -230,4 +317,6 @@ module.exports = {
 	loginStatus,
 	updateUser,
 	changePassword,
+	forgotPassword,
+	resetPassword,
 }
