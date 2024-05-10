@@ -5,7 +5,9 @@ const cors = require('cors')
 const dotenv = require('dotenv').config()
 const cookieParser = require("cookie-parser")
 const userRoute = require('./routes/userRoute')
+const contactRoute = require('./routes/contactRoute')
 const errorHandler = require('./middlewares/errorMiddleware')
+const path = require('path');
 
 const app = express()
 
@@ -16,8 +18,11 @@ app.use(express.urlencoded({ extended: false }))
 app.use(bodyParser.json())
 app.use(cors())
 
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
+
 //Routers Middlewares
 app.use('/api/users', userRoute)
+app.use('/api/contactus', contactRoute)
 
 //Routes
 app.get('/', (req, res) => {
