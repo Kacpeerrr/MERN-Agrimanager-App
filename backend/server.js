@@ -6,6 +6,9 @@ const dotenv = require('dotenv').config()
 const cookieParser = require("cookie-parser")
 const userRoute = require('./routes/userRoute')
 const contactRoute = require('./routes/contactRoute')
+const fieldRoute = require('./routes/fieldRoute')
+const machineRoute = require('./routes/machineRoute')
+const documentRoute = require('./routes/documentRoute')
 const errorHandler = require('./middlewares/errorMiddleware')
 const path = require('path');
 
@@ -16,13 +19,19 @@ app.use(express.json())
 app.use(cookieParser())
 app.use(express.urlencoded({ extended: false }))
 app.use(bodyParser.json())
-app.use(cors())
+app.use(cors({
+    origin: ["http://localhost:3000"],
+	credentials: true
+}));
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
 
-//Routers Middlewares
+//Routes Middlewares
 app.use('/api/users', userRoute)
 app.use('/api/contactus', contactRoute)
+app.use('/api/fields', fieldRoute)
+app.use('/api/machines', machineRoute)
+app.use('/api/documents', documentRoute)
 
 //Routes
 app.get('/', (req, res) => {
@@ -33,7 +42,7 @@ app.get('/', (req, res) => {
 app.use(errorHandler)
 
 //Connect to DB and start server
-const PORT = process.env.PORT || 3000
+const PORT = process.env.PORT || 5000
 mongoose
     .connect(process.env.MONGO_URI)
     .then(() => {
